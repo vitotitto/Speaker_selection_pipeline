@@ -1,0 +1,98 @@
+﻿project:
+  data_root: D:/medgemma_data/dementianet_updated_files
+  runs_root: runs
+  csv_dir: csv_sources
+  pyannote_local_root: pyannote_results_local
+  extraction_output_root: processed_7_continuity_full
+
+runtime:
+  python_exe: C:/Users/victy/anaconda_new/envs/audio/python.exe
+  continue_on_error: true
+  log_file: logs/golden_bootstrap.log
+  summary_file: logs/golden_bootstrap_summary.json
+
+stages:
+  # Stage 1: extract audio from video (+ optional local Whisper ASR).
+  # With skip: true, only audio files are produced — no GPU model is loaded.
+  # Stage 2 (pyannote API with write_standard: true) provides the transcript.
+  # To run fully local without the API, set skip: false here and disable Stage 2.
+  stage_1_asr_prepare:
+    enabled: true
+    input_sources:
+      - Dementia_raw_data
+      - No_Dementia_raw_data
+    allowed_extensions:
+      - .mkv
+      - .mp4
+      - .avi
+      - .mov
+      - .webm
+      - .ts
+      - .m4v
+      - .m4a
+    force: false
+    max_files: null
+    audio:
+      pcm_codec: pcm_s24le
+      model_sample_rate: 16000
+      model_channels: 1
+    asr:
+      # skip: true  → extract audio only, no Whisper (Stage 2 provides transcript)
+      # skip: false → run local Whisper ASR (use when Stage 2 is disabled)
+      skip: true
+      backend: faster-whisper
+      model_name: large-v3
+      language: en
+      device: cuda
+      compute_type: float16
+      beam_size: 5
+      batch_size: 16
+      vad_filter: true
+
+  # Stage B: pyannote API diarization + transcription (Precision 1 profile)
+  stage_2_pyannote_api:
+    enabled: true
+    batch: true
+    run_dir: null
+    run_list_file: null
+    audio_file: audio_base.wav
+    api_key_env: PYANNOTE_API
+    api_base_url: https://api.pyannote.ai/v1
+    model: precision-1
+    transcription_model: parakeet-tdt-0.6b-v3
+    transcription: true
+    exclusive: true
+    confidence: true
+    turn_level_confidence: true
+    # Keep *_api and also write canonical transcript/segments for downstream LLM stages.
+    write_standard: true
+    prefer_exclusive: true
+    webhook: null
+    num_speakers: null
+    min_speakers: null
+    max_speakers: null
+    poll_interval_s: 20
+    timeout_s: 259200
+    timeout_http_s: 120
+    max_runs: null
+    submit_only: false
+    poll_only: false
+    force: false
+    retry_failed: false
+    log_file: pyannote_api.log
+    report_file: null
+
+  stage_3_pyannote_local:
+    enabled: false
+
+  # LLM and extraction stages are done in the finalize profile.
+  stage_4_audit:
+    enabled: false
+  stage_5_speaker_analysis:
+    enabled: false
+  stage_6_overlap_transfer:
+    enabled: false
+  stage_7_extraction:
+    enabled: false
+  stage_8_extraction_budget:
+    enabled: false

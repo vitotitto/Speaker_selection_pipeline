@@ -1,0 +1,57 @@
+﻿project:
+  data_root: D:/medgemma_data/dementianet_updated_files
+  runs_root: runs
+  csv_dir: csv_sources
+  pyannote_local_root: pyannote_results_local
+  extraction_output_root: processed_7_continuity_full
+
+runtime:
+  python_exe: C:/Users/victy/anaconda_new/envs/audio/python.exe
+  continue_on_error: true
+  log_file: logs/missing_control_stage1.log
+  summary_file: logs/missing_control_stage1_summary.json
+
+stages:
+  stage_1_asr_prepare:
+    enabled: true
+    input_sources:
+      - No_Dementia_raw_data/missing_control
+    allowed_extensions:
+      - .mkv
+      - .mp4
+      - .avi
+      - .mov
+      - .webm
+      - .ts
+      - .m4v
+      - .m4a
+    force: false
+    max_files: null
+    audio:
+      pcm_codec: pcm_s24le
+      model_sample_rate: 16000
+      model_channels: 1
+    asr:
+      backend: faster-whisper
+      model_name: large-v3
+      language: en
+      device: cuda
+      compute_type: float16
+      beam_size: 5
+      batch_size: 16
+      vad_filter: true
+
+  stage_2_pyannote_api:
+    enabled: false
+  stage_3_pyannote_local:
+    enabled: false
+  stage_4_audit:
+    enabled: false
+  stage_5_speaker_analysis:
+    enabled: false
+  stage_6_overlap_transfer:
+    enabled: false
+  stage_7_extraction:
+    enabled: false
+  stage_8_extraction_budget:
+    enabled: false

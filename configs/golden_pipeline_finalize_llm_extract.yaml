@@ -1,0 +1,75 @@
+﻿project:
+  data_root: D:/medgemma_data/dementianet_updated_files
+  runs_root: runs
+  csv_dir: csv_sources
+  pyannote_local_root: pyannote_results_local
+  extraction_output_root: processed_7_continuity_full
+
+runtime:
+  python_exe: C:/Users/victy/anaconda_new/envs/audio/python.exe
+  continue_on_error: true
+  log_file: logs/golden_finalize.log
+  summary_file: logs/golden_finalize_summary.json
+
+stages:
+  stage_1_asr_prepare:
+    enabled: false
+
+  stage_2_pyannote_api:
+    enabled: false
+
+  stage_3_pyannote_local:
+    enabled: false
+
+  # Keep audit before speaker analysis (as discussed).
+  stage_4_audit:
+    enabled: true
+    force: true
+
+  stage_5_speaker_analysis:
+    enabled: true
+    provider: gemini
+    model: gemini-2.0-flash
+    dry_run: false
+    force: true
+    v2_only: false
+    disable_named_turn_guard: false
+    disable_subject_anchor: false
+
+  stage_6_overlap_transfer:
+    enabled: false
+    source_speaker_analysis: speaker_analysis.json
+    source_segments: segments_detailed.json
+    output_speaker_analysis: speaker_analysis_overlap_selected.json
+    min_overlap_ratio: 0.50
+    min_overlap_seconds: 1.0
+    default_quality: 0.75
+    force: false
+    report_prefix: helper_scripts/overlap_transfer_batch
+
+  stage_7_extraction:
+    enabled: true
+    output_root: processed_7_continuity_full
+    speaker_analysis_file: auto
+    selection_mode: continuity_first
+    force: false
+    dry_run: false
+    quality_threshold: 0.70
+    top_quality_fraction: 0.75
+    max_total_minutes: 5.0
+    min_segment_duration_s: 4.0
+    max_segment_duration_s: null
+    resample_to: null
+    split_segments: false
+    max_gap_s: 0.75
+    acoustic_post_filter: true
+    acoustic_min_speech_band_ratio: 0.38
+    acoustic_min_voiced_ratio: 0.28
+    acoustic_max_music_score: 0.60
+    acoustic_min_speaker_consistency: 0.60
+    acoustic_min_subject_similarity: 0.45
+    denoise_output: true
+    denoise_strength: 0.65
+
+  stage_8_extraction_budget:
+    enabled: false

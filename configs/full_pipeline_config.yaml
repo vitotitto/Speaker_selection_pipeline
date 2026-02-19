@@ -1,0 +1,173 @@
+project:
+  # Data root that contains Dementia_raw_data, No_Dementia_raw_data, runs, etc.
+  # UPDATE THIS PATH to point to your data directory.
+  # data_root: D:/medgemma_data/dementianet_updated_files
+  data_root: data
+  runs_root: runs
+  csv_dir: csv_sources
+  pyannote_local_root: pyannote_results_local
+  extraction_output_root: processed_7_llm_default
+
+runtime:
+  # Use the audio conda env interpreter.
+  # UPDATE THIS PATH to your python executable if needed, or rely on the active environment.
+  # python_exe: C:/Users/victy/anaconda_new/envs/audio/python.exe
+  python_exe: python
+  continue_on_error: true
+  log_file: logs/full_pipeline.log
+  summary_file: logs/full_pipeline_summary.json
+
+stages:
+  stage_1_asr_prepare:
+    enabled: true
+    input_sources:
+      - Dementia_raw_data
+      - No_Dementia_raw_data
+    allowed_extensions:
+      - .mkv
+      - .mp4
+      - .avi
+      - .mov
+      - .webm
+      - .ts
+      - .m4v
+      - .m4a
+    force: false
+    max_files: null
+    audio:
+      pcm_codec: pcm_s24le
+      model_sample_rate: 16000
+      model_channels: 1
+    asr:
+      # skip: false → run local Whisper ASR (default; use when Stage 2 is disabled)
+      # skip: true  → extract audio only, no Whisper (when Stage 2 provides transcript)
+      # Backend options: faster-whisper, whisperx
+      skip: false
+      backend: faster-whisper
+      model_name: large-v3
+      language: en
+      device: cuda
+      compute_type: float16
+      beam_size: 5
+      batch_size: 16
+      vad_filter: true
+
+  stage_2_pyannote_api:
+    enabled: false
+    batch: true
+    run_dir: null
+    run_list_file: null
+    audio_file: audio_base.wav
+    api_key_env: PYANNOTE_API
+    api_base_url: https://api.pyannote.ai/v1
+    model: precision-2
+    transcription_model: parakeet-tdt-0.6b-v3
+    transcription: true
+    exclusive: true
+    confidence: true
+    turn_level_confidence: true
+    write_standard: false
+    prefer_exclusive: true
+    webhook: null
+    num_speakers: null
+    min_speakers: null
+    max_speakers: null
+    poll_interval_s: 20
+    timeout_s: 259200
+    timeout_http_s: 120
+    max_runs: null
+    submit_only: false
+    poll_only: false
+    force: false
+    retry_failed: false
+    log_file: pyannote_api.log
+    report_file: null
+
+  stage_3_pyannote_local:
+    enabled: false
+    audio_file: audio/audio_16k.wav
+    model: pyannote/speaker-diarization-community-1
+    hf_token_env: HF_TOKEN
+    device: auto
+    min_speakers: null
+    max_speakers: null
+    max_runs: null
+    max_audio_hours: null
+    skip_if_cloud_submitted: true
+    skip_existing_local: true
+    exclude_run_list_file: []
+    progress_json: helper_scripts/local_pyannote_progress_live.json
+    progress_csv: helper_scripts/local_pyannote_progress.csv
+    selection_report: helper_scripts/local_pyannote_selection.json
+    log_file: local_pyannote_batch.log
+    fail_fast: false
+
+  # Audit runs before speaker analysis (as discussed).
+  stage_4_audit:
+    enabled: false
+    force: false
+
+  stage_5_speaker_analysis:
+    enabled: false
+    provider: gemini
+    model: gemini-2.0-flash
+    dry_run: false
+    force: false
+    v2_only: false
+    disable_named_turn_guard: false
+    disable_subject_anchor: false
+
+  # Reuse prior LLM speaker decisions on newer diarization timelines.
+  stage_6_overlap_transfer:
+    enabled: false
+    source_speaker_analysis: speaker_analysis.json
+    source_segments: segments_detailed.json
+    output_speaker_analysis: speaker_analysis_overlap_selected.json
+    min_overlap_ratio: 0.50
+    min_overlap_seconds: 1.0
+    default_quality: 0.75
+    force: false
+    report_prefix: helper_scripts/overlap_transfer_batch
+
+  stage_7_extraction:
+    enabled: true
+    output_root: processed_7_llm_default
+    # "auto": speaker_analysis.json unless overlap stage is enabled.
+    speaker_analysis_file: auto
+    # continuity_first is the new default to preserve uninterrupted speech.
+    selection_mode: continuity_first
+    force: true
+    dry_run: false
+    quality_threshold: 0.70
+    top_quality_fraction: 0.75
+    max_total_minutes: 5.0
+    min_segment_duration_s: 4.0
+    max_segment_duration_s: null
+    resample_to: null
+    split_segments: false
+    max_gap_s: 0.75
+    acoustic_post_filter: true
+    acoustic_min_speech_band_ratio: 0.38
+    acoustic_min_voiced_ratio: 0.28
+    acoustic_max_music_score: 0.60
+    acoustic_min_speaker_consistency: 0.60
+    acoustic_min_subject_similarity: 0.45
+    denoise_output: true
+    denoise_strength: 0.65
+
+  # Optional: enforce per-person cap with scored candidate pool.
+  stage_8_extraction_budget:
+    enabled: false
+    output_root: processed_budget
+    # "auto": speaker_analysis.json unless overlap stage is enabled.
+    speaker_analysis_file: auto
+    force: true
+    minutes_per_person: 5.0
+    quality_threshold: 0.70
+    top_quality_fraction: 0.30
+    min_segment_duration_s: 4.0
+    alpha_quality: 0.70
+    beta_acoustic: 0.30
+    acoustic_post_filter: true
+    denoise_output: true
+

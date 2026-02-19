@@ -1,0 +1,19 @@
+# Core packages with explicit versions to prevent backtracking
+pyyaml==6.0.3
+numpy>=2.1.0,<2.3.0
+onnxruntime>=1.19.0  # This version supports numpy 2.x
+ctranslate2>=4.5.0
+pandas>=2.2.3,<2.4.0
+av>=15.0.0,<16.0.0
+
+# Main packages
+whisperx
+faster-whisper
+pyannote.audio==3.3.2
+torch
+torchaudio
+soundfile
+demucs
+deepfilternet==0.5.6
+google-generativeai
+python-dotenv

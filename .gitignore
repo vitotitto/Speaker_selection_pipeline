@@ -1,0 +1,25 @@
+# Configuration
+.env
+configs/local_*.yaml
+
+# Logs
+logs/
+*.log
+
+# Bytecode
+__pycache__/
+*.pyc
+
+# Data (ensure we don't accidentally commit data)
+runs/
+processed*/
+pyannote_results*/
+audio_extraction/
+audio_extraction*/
+csv_sources/
+
+# Internal docs (README.md is the public reference)
+docs/
+
+# IDE / tool state
+.claude/
