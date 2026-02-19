@@ -10,7 +10,7 @@ logs/
 __pycache__/
 *.pyc
 
-# Data (ensure we don't accidentally commit data)
+# Data 
 runs/
 processed*/
 pyannote_results*/
@@ -18,8 +18,8 @@ audio_extraction/
 audio_extraction*/
 csv_sources/
 
-# Internal docs (README.md is the public reference)
+# Internal docs
 docs/
 
-# IDE / tool state
-.claude/
+
+
