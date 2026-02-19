@@ -1,26 +1,26 @@
-# Speaker Selection Pipeline: Complete Reference
+# Speaker Selection Pipeline
 
-This document is the detailed description of the Speaker Selection Pipeline - what it does, why every part exists, how the "golden pipeline setup"  works end-to-end, what alternative options are available for experimentation, and what caveats to be aware of.
+This document provides a detailed description of the Speaker Selection Pipeline: what it does, why each part exists, how the "golden pipeline setup" works end-to-end, which alternative options are available for experimentation, and what caveats to be aware of.
 
 ---
 
 ## 1. The purpose of the pipeline
 
-The DementiaNet dataset is the only publicly available dataset (with no university affiliation), it consists of raw video interviews with famous people, actors, politicians,  athletes, who were known to have dementia or Alzheimer's,  (and healthy controls). Each video typically contains at least two speakers: the **subject** (patient) and an **interviewer** (clinician, journalist, family member). Some videos contain additional speakers, narrators, or background noise.
+The DementiaNet dataset is the only publicly available dataset (with no university affiliation). It consists of raw video interviews with famous people, actors, politicians, and athletes who were known to have dementia or Alzheimer's, and healthy controls. Each video typically contains at least two speakers: the **subject** (patient) and an **interviewer** (clinician, journalist, family member). Some videos contain additional speakers, narrators, or background noise.
 
 
 
-The original initiative of this idea and dataset belongs to Shreyas Gite, and can be accessed from repository here:   https://github.com/shreyasgite/dementianet 
+The original initiative of this idea and dataset belongs to Shreyas Gite, and can be accessed from the repository here:   https://github.com/shreyasgite/dementianet 
 
-It is however notoriously time-consuming searching for the parts of the videos where, where clear speech of the person of interest is present, and requires a lot of processing hours. 
+It is, however, notoriously time-consuming to search for the parts of the videos where clear speech of the person of interest is present, and requires a lot of processing hours. 
 
 
 
-This project is an attempt to automate the curation of similar datasets, where there are videos of interviews and is a need to check the content quality and find the speech samples from the person of interest. The goal is to produce a clean audio dataset containing **only the subject's speech**, suitable for downstream voice biomarker analysis (e.g., with MedGemma or similar medical ML models). This means solving several hard problems simultaneously:
+This project is an attempt to automate the curation of similar datasets, where there are videos of interviews and there is a need to check the content quality and find the speech samples from the person of interest. The goal is to produce a clean audio dataset containing **only the subject's speech**, suitable for downstream voice biomarker analysis (e.g., with MedGemma or similar medical ML models). This means solving several hard problems simultaneously:
 
 1. **Speaker separation**: Diarisation tells you *when* each speaker talks, but assigns anonymous labels (SPEAKER_00, SPEAKER_01). It does not tell you *who* is the patient.
 2. **Speaker identification**: An LLM reads the transcript with patient metadata (name, age, diagnosis) and determines which anonymous speaker label belongs to the person of interest.
-3. **Content validation**: Not all videos are usable if the video search was performed by automated system of with the use of agentic AI. Some are tributes, obituaries, or music performances where the subject never actually speaks.
+3. **Content validation**: Not all videos are usable if the video search was performed by an automated system with the use of agentic AI. Some are tributes, obituaries, or music performances where the subject never actually speaks.
 4. **Quality control**: ASR engines can produce erroneous transcriptions for silence or noise segments. Background music, crosstalk, and low-quality audio must be filtered out. (When using Whisper as the ASR source, specific hallucination detection is available via quality metrics; the golden pipeline uses Pyannote's transcription instead and relies on the LLM and acoustic post-filter for quality control.)
 5. **Dataset balance**: Without caps, some subjects would have 30 minutes of speech and others 30 seconds. The pipeline enforces a per-run budget (default 5 minutes).
 
@@ -32,7 +32,7 @@ The pipeline handles all of this automatically, at scale, with minimal human int
 
 ---
 
-## 2. The Golden pipeline setup (best-results profile after my test)
+## 2. The Golden pipeline setup (best results profile after my test)
 
 The golden pipeline is the preserved configuration that produced the best results. It is the recommended starting point for all new processing. It runs in two distinct phases, deliberately split because they have different cost and computation profiles.
 
@@ -40,7 +40,7 @@ The golden pipeline is the preserved configuration that produced the best result
 
 **Config**: `configs/golden_pipeline_bootstrap_api_precision1.yaml`
 
-**What it does**: Extracts audio from every video file (FFmpeg), then submits audio to the Pyannote cloud API which performs both speaker diarisation and transcription in a single job. The Pyannote API produces the transcript that all downstream stages consume.
+**What it does**: Extracts audio from every video file (FFmpeg), then submits audio to the Pyannote cloud API, which performs both speaker diarisation and transcription in a single job. The Pyannote API produces the transcript that all downstream stages consume.
 
 Stage 1 is configured with `asr.skip: true` in the golden config, so it **only extracts audio** — no Whisper model is loaded and no GPU time is spent on ASR. The Pyannote API (Stage 2 with `write_standard: true`) writes all transcript files directly. To run fully local without the API, set `asr.skip: false` in Stage 1 and disable Stage 2 (see Section 3).
 
@@ -51,7 +51,7 @@ Stage 1 is configured with `asr.skip: true` in the golden config, so it **only e
 python orchestrate_full_pipeline.py --config configs/golden_pipeline_bootstrap_api_precision1.yaml
 ```
 
-**Stages enabled**: Stage 1 (audio extraction only, `asr.skip: true`) + Stage 2 (Pyannote API diarisation + transcription). Everything else disabled.
+**Stages enabled**: Stage 1 (audio extraction only, `asr.skip: true`) + Stage 2 (Pyannote API diarisation + transcription). Everything else is disabled.
 
 ### Intermediate step: Content screening
 
@@ -77,16 +77,16 @@ python helper_scripts/run_audit.py --batch --runs-root <runs_path> --csv-dir <cs
 
 **Config**: `configs/golden_pipeline_finalize_llm_extract.yaml`
 
-**What it does**: Runs audit, LLM speaker analysis (identify who is the patient), and final audio extraction (cut clips, filter acoustically, denoise).
+**What it does**: Runs an audit, LLM speaker analysis (identifies who the patient is), and final audio extraction (cuts clips, filters acoustically, and denoises).
 
-**Why it's separate**: This phase uses cheap, fast LLM calls and signal processing. You can re-run it with different LLM models, different extraction parameters, or different acoustic filter thresholds without re-doing the expensive bootstrap work.
+**Why it's separate**: This phase uses cheap, fast LLM calls and signal processing. You can re-run it with different LLM models, different extraction parameters, or different acoustic filter thresholds without redoing the expensive bootstrap work.
 
 **Command**:
 ```
 python orchestrate_full_pipeline.py --config configs/golden_pipeline_finalize_llm_extract.yaml
 ```
 
-**Stages enabled**: Stage 4 (Audit) + Stage 5 (Speaker Analysis) + Stage 7 (Extraction). Everything else disabled.
+**Stages enabled**: Stage 4 (Audit) + Stage 5 (Speaker Analysis) + Stage 7 (Extraction). Everything else is disabled.
 
 ### Golden pipeline settings
 
@@ -988,3 +988,4 @@ After a successful full pipeline run, expect these files per run:
 ## Acknowledgements
 
 Parts of the codebase and documentation were developed with the assistance of large language models, including OpenAI GPT-5.2, Anthropic Claude Opus 4.6, and Google Gemini 3, used at various stages of research, implementation, and writing.
+
