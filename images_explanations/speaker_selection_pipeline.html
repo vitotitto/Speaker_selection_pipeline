@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SpeechSense Monitor — Automated Speaker Selection Pipeline</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: #f5f6f8;
+    color: #4a5568;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+  }
+
+  .container { width: 1500px; max-width: 100%; }
+
+  h1 {
+    font-size: 26px;
+    font-weight: 500;
+    color: #1a202c;
+    margin-bottom: 6px;
+    letter-spacing: -0.3px;
+  }
+
+  .subtitle {
+    font-size: 15px;
+    color: #718096;
+    margin-bottom: 20px;
+    font-weight: 300;
+  }
+
+  .problem-bar {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 36px;
+  }
+
+  .problem-tag {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #4a5568;
+    flex: 1;
+    text-align: center;
+  }
+
+  .problem-tag strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1a202c;
+    margin-bottom: 3px;
+  }
+
+  .problem-tag span {
+    font-size: 12px;
+    color: #718096;
+  }
+
+  .section-label {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #a0aec0;
+    margin-bottom: 14px;
+  }
+
+  .pipeline-flow {
+    display: flex;
+    gap: 0;
+    align-items: stretch;
+    margin-bottom: 28px;
+  }
+
+  .stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 0 6px;
+  }
+
+  .stage-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 18px 16px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  .stage-card.llm {
+    border-top: 3px solid #8b5cf6;
+  }
+
+  .stage-card.signal {
+    border-top: 3px solid #0ea5e9;
+  }
+
+  .stage-card.quality {
+    border-top: 3px solid #f59e0b;
+  }
+
+  .stage-card.output {
+    border-top: 3px solid #10b981;
+  }
+
+  .stage-num {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: #a0aec0;
+    margin-bottom: 8px;
+  }
+
+  .stage-title {
+    font-size: 15px;
+    font-weight: 500;
+    color: #1a202c;
+    margin-bottom: 8px;
+    line-height: 1.3;
+  }
+
+  .stage-desc {
+    font-size: 13px;
+    color: #718096;
+    line-height: 1.5;
+    flex-grow: 1;
+  }
+
+  .stage-type {
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    display: inline-block;
+    align-self: flex-start;
+  }
+
+  .stage-type.llm-tag {
+    color: #7c3aed;
+    background: #ede9fe;
+  }
+
+  .stage-type.signal-tag {
+    color: #0284c7;
+    background: #e0f2fe;
+  }
+
+  .stage-type.quality-tag {
+    color: #d97706;
+    background: #fef3c7;
+  }
+
+  .stage-type.output-tag {
+    color: #059669;
+    background: #ecfdf5;
+  }
+
+  .arrow-col {
+    display: flex;
+    align-items: center;
+    color: #cbd5e0;
+    font-size: 18px;
+    padding: 0 2px;
+    flex-shrink: 0;
+  }
+
+  .gate-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .gate-card {
+    flex: 1;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-left: 3px solid #8b5cf6;
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+
+  .gate-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a202c;
+    margin-bottom: 6px;
+  }
+
+  .gate-desc {
+    font-size: 13px;
+    color: #718096;
+    line-height: 1.55;
+  }
+
+  .gate-action {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #7c3aed;
+    font-weight: 500;
+  }
+
+  .constraints-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .constraint {
+    flex: 1;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+
+  .constraint .label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #a0aec0;
+    margin-bottom: 6px;
+  }
+
+  .constraint .value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 15px;
+    font-weight: 500;
+    color: #1a202c;
+  }
+
+  .constraint .why {
+    font-size: 12px;
+    color: #718096;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Automated Speaker Selection Pipeline</h1>
+  <div class="subtitle">LLM-assisted data curation: from raw interviews to clean patient speech</div>
+
+  <!-- Problems solved -->
+  <div class="problem-bar">
+    <div class="problem-tag">
+      <strong>Speaker separation</strong>
+      <span>Who speaks when?</span>
+    </div>
+    <div class="problem-tag">
+      <strong>Speaker identification</strong>
+      <span>Which speaker is the patient?</span>
+    </div>
+    <div class="problem-tag">
+      <strong>Content validation</strong>
+      <span>Does the subject actually speak?</span>
+    </div>
+    <div class="problem-tag">
+      <strong>Quality control</strong>
+      <span>Noise, music, crosstalk?</span>
+    </div>
+    <div class="problem-tag">
+      <strong>Dataset balance</strong>
+      <span>Fair per-speaker budget</span>
+    </div>
+  </div>
+
+  <!-- Pipeline flow -->
+  <div class="section-label">Pipeline Stages</div>
+  <div class="pipeline-flow">
+    <div class="stage">
+      <div class="stage-card signal">
+        <div class="stage-num">01</div>
+        <div class="stage-title">Audio Extraction</div>
+        <div class="stage-desc">Raw video → WAV. FFmpeg extraction, resampled to 16kHz mono.</div>
+        <div class="stage-type signal-tag">Signal</div>
+      </div>
+    </div>
+    <div class="arrow-col">→</div>
+    <div class="stage">
+      <div class="stage-card signal">
+        <div class="stage-num">02</div>
+        <div class="stage-title">Diarization + Transcription</div>
+        <div class="stage-desc">Cloud API: speaker segmentation with per-turn confidence scores. Transcript aligned to speaker turns.</div>
+        <div class="stage-type signal-tag">Signal</div>
+      </div>
+    </div>
+    <div class="arrow-col">→</div>
+    <div class="stage">
+      <div class="stage-card llm">
+        <div class="stage-num">03</div>
+        <div class="stage-title">Content Screening</div>
+        <div class="stage-desc">LLM reads transcript + patient metadata. Rejects obituaries, tributes, music — files where the subject never speaks.</div>
+        <div class="stage-type llm-tag">LLM Gate</div>
+      </div>
+    </div>
+    <div class="arrow-col">→</div>
+    <div class="stage">
+      <div class="stage-card quality">
+        <div class="stage-num">04</div>
+        <div class="stage-title">Quality Audit</div>
+        <div class="stage-desc">Pre-validation: sufficient data quality and transcript coverage before spending tokens on speaker analysis.</div>
+        <div class="stage-type quality-tag">Quality</div>
+      </div>
+    </div>
+    <div class="arrow-col">→</div>
+    <div class="stage">
+      <div class="stage-card llm">
+        <div class="stage-num">05</div>
+        <div class="stage-title">Speaker Analysis</div>
+        <div class="stage-desc">LLM maps anonymous speaker labels to real identities. Determines which SPEAKER_XX is the patient using name, age, diagnosis context.</div>
+        <div class="stage-type llm-tag">LLM Gate</div>
+      </div>
+    </div>
+    <div class="arrow-col">→</div>
+    <div class="stage">
+      <div class="stage-card output">
+        <div class="stage-num">06</div>
+        <div class="stage-title">Extraction</div>
+        <div class="stage-desc">Cut patient-only speech. Acoustic post-filter rejects noise segments. Denoise. Cap at per-speaker budget.</div>
+        <div class="stage-type output-tag">Output</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LLM Quality Gates detail -->
+  <div class="section-label">LLM Quality Gates — Detail</div>
+  <div class="gate-row">
+    <div class="gate-card">
+      <div class="gate-title">Content Screening</div>
+      <div class="gate-desc">Samples first 30 + last 10 transcript segments. LLM classifies: does the named subject produce speech in this recording? Prevents speaker analysis from running on unusable files.</div>
+      <div class="gate-action">Reject → skip all downstream stages</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-title">Speaker Analysis</div>
+      <div class="gate-desc">LLM receives full transcript with anonymous speaker labels + patient metadata (name, diagnosis, interview context). Returns speaker mapping with confidence. Near-deterministic (temperature 0.1).</div>
+      <div class="gate-action">Low confidence → manual review flag</div>
+    </div>
+    <div class="gate-card">
+      <div class="gate-title">Acoustic Post-Filter</div>
+      <div class="gate-desc">Signal-level validation after extraction. Rejects segments with music, excessive noise, or acoustic outliers. Runs independently of LLM judgments as a final safety net.</div>
+      <div class="gate-action">Reject → segment excluded from final output</div>
+    </div>
+  </div>
+
+  <!-- Extraction constraints -->
+  <div class="section-label">Extraction Constraints</div>
+  <div class="constraints-row">
+    <div class="constraint">
+      <div class="label">Per-speaker cap</div>
+      <div class="value">5 minutes</div>
+      <div class="why">Prevents dataset imbalance</div>
+    </div>
+    <div class="constraint">
+      <div class="label">Min segment</div>
+      <div class="value">≥ 4 seconds</div>
+      <div class="why">Shorter clips not useful for voice analysis</div>
+    </div>
+    <div class="constraint">
+      <div class="label">Extraction mode</div>
+      <div class="value">continuity_first</div>
+      <div class="why">Groups adjacent segments into natural speech phrases</div>
+    </div>
+    <div class="constraint">
+      <div class="label">Denoise</div>
+      <div class="value">strength 0.65</div>
+      <div class="why">Background noise reduction</div>
+    </div>
+    <div class="constraint">
+      <div class="label">Diarization</div>
+      <div class="value">exclusive</div>
+      <div class="why">Each moment assigned to exactly one speaker</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
